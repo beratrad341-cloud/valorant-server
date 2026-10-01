@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VALORANT // Tactical Hub & Dynamic Background</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Google Fonts for Valorant-like styling -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Teko:wght@500;600;700&family=Rajdhani:wght@500;600;700&family=Tungsten&family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            valRed: '#ff4655',
+            valCyan: '#00f0ff',
+            valDark: '#070a14',
+            valNavy: '#0f1923',
+            valGrey: '#ece8e1',
+            valPurple: '#a855f7',
+          },
+          fontFamily: {
+            valHeader: ['Teko', 'sans-serif'],
+            valSub: ['Rajdhani', 'sans-serif'],
+            body: ['Inter', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    :root {
+      --primary-color: #ff4655;
+      --secondary-color: #00f0ff;
+      --glow-opacity: 0.8;
+      --particle-speed: 1;
+    }
+
+    body {
+      background-color: #070a14;
+      color: #ece8e1;
+      font-family: 'Inter', sans-serif;
+      overflow-x: hidden;
+      user-select: none;
+    }
+
+    /* Clip paths for authentic Valorant angular cutouts */
+    .val-cut-corner {
+      clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px));
+    }
+
+    .val-cut-btn {
+      clip-path: polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px);
+    }
+
+    .val-tag {
+      clip-path: polygon(0 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
+    }
+
+    /* Tactical Background Elements */
+    .grid-overlay {
+      background-image: 
+        linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+      background-size: 50px 50px;
+    }
+
+    /* Dynamic Neon Lines */
+    .neon-line {
+      position: absolute;
+      border-radius: 9999px;
+      transition: all 0.5s ease;
+      filter: drop-shadow(0 0 calc(10px * var(--glow-opacity)) var(--line-color));
+      background: var(--line-color);
+      opacity: var(--glow-opacity);
+    }
+
+    .line-red {
+      --line-color: var(--primary-color);
+    }
+
+    .line-cyan {
+      --line-color: var(--secondary-color);
+    }
+
+    /* Animated scanning line */
+    @keyframes radarScan {
+      0% { transform: translateY(-100%); opacity: 0; }
+      50% { opacity: 0.5; }
+      100% { transform: translateY(100vh); opacity: 0; }
+    }
+
+    .radar-line {
+      position: fixed;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent 0%, var(--primary-color) 50%, transparent 100%);
+      box-shadow: 0 0 15px var(--primary-color);
+      animation: radarScan 8s infinite linear;
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    /* Custom Glassmorphism Card */
+    .val-glass {
+      background: rgba(15, 25, 35, 0.75);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+    }
+
+    .val-glass-hover:hover {
+      border-color: var(--primary-color);
+      box-shadow: 0 0 25px rgba(255, 70, 85, 0.3);
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #070a14;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #ff4655;
+      border-radius: 3px;
+    }
+
+    /* Pulse animation for HUD status */
+    @keyframes pulseGlow {
+      0%, 100% { opacity: 0.3; transform: scale(1); }
+      50% { opacity: 0.8; transform: scale(1.03); }
+    }
+    .hud-pulse {
+      animation: pulseGlow 4s infinite ease-in-out;
+    }
+  </style>
+</head>
+<body class="relative min-h-screen flex flex-col justify-between overflow-x-hidden antialiased select-none">
+
+  <!-- Dynamic Particle Canvas -->
+  <canvas id="particleCanvas" class="fixed inset-0 pointer-events-none z-0"></canvas>
+
+  <!-- Tactical Grid Overlay -->
+  <div class="fixed inset-0 grid-overlay pointer-events-none z-0"></div>
+
+  <!-- Radar Scanning Effect -->
+  <div class="radar-line"></div>
+
+  <!-- Ambient Glow Gradients -->
+  <div id="glowRed" class="fixed -top-24 -left-24 w-96 h-96 rounded-full pointer-events-none z-0 transition-all duration-700 blur-[120px]" style="background: var(--primary-color); opacity: 0.25;"></div>
+  <div id="glowCyan" class="fixed -bottom-24 -right-24 w-96 h-96 rounded-full pointer-events-none z-0 transition-all duration-700 blur-[120px]" style="background: var(--secondary-color); opacity: 0.25;"></div>
+
+  <!-- Geometric Neon Accent Lines -->
+  <div class="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+    <!-- Diagonal Lines Top Right -->
+    <div class="neon-line line-red top-[-10%] right-[10%] w-[500px] h-[3px] rotate-[-35deg]"></div>
+    <div class="neon-line line-cyan top-[5%] right-[5%] w-[350px] h-[2px] rotate-[-35deg] opacity-60"></div>
+    
+    <!-- Diagonal Lines Bottom Left -->
+    <div class="neon-line line-cyan bottom-[-5%] left-[5%] w-[600px] h-[3px] rotate-[-35deg]"></div>
+    <div class="neon-line line-red bottom-[10%] left-[10%] w-[300px] h-[2px] rotate-[-35deg] opacity-60"></div>
+
+    <!-- Vertical Tactical Side Bars -->
+    <div class="absolute left-6 top-1/3 bottom-1/3 w-[2px] bg-gradient-to-b from-transparent via-[var(--primary-color)] to-transparent opacity-40"></div>
+    <div class="absolute right-6 top-1/4 bottom-1/4 w-[2px] bg-gradient-to-b from-transparent via-[var(--secondary-color)] to-transparent opacity-40"></div>
+  </div>
+
+  <!-- Header / Navigation HUD -->
+  <header class="relative z-10 w-full px-6 py-4 flex items-center justify-between border-b border-white/10 bg-valNavy/60 backdrop-blur-md">
+    <div class="flex items-center gap-4">
+      <!-- Valorant Logo Icon -->
+      <div class="w-10 h-10 bg-valRed flex items-center justify-center val-cut-btn text-black font-bold text-xl cursor-pointer hover:bg-white transition-colors duration-300">
+        <svg class="w-6 h-6 fill-current" viewBox="0 0 100 100">
+          <path d="M 0,15 L 35,15 L 100,85 L 65,85 Z" />
+          <path d="M 65,15 L 100,15 L 100,50 Z" />
+        </svg>
+      </div>
+      <div class="flex flex-col">
+        <span class="font-valHeader text-2xl tracking-widest text-white leading-none">VALORANT // PROTOCOL</span>
+        <span class="text-[10px] font-mono text-valCyan tracking-widest">TACTICAL NETWORK v4.08</span>
+      </div>
+    </div>
+
+    <!-- Live Status Indicator -->
+    <div class="hidden md:flex items-center gap-6 font-mono text-xs">
+      <div class="flex items-center gap-2">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+        <span class="text-emerald-400 font-semibold">SERVER: ONLINE (12 MS)</span>
+      </div>
+      <div class="text-gray-400">|</div>
+      <div class="text-gray-300">ACT III // EPISODE 8</div>
+    </div>
+
+    <!-- Control Toggle Trigger -->
+    <button id="toggleSettingsBtn" class="val-cut-btn bg-white/10 hover:bg-valRed hover:text-black border border-white/20 text-white px-4 py-2 text-xs font-valSub tracking-wider uppercase transition-all duration-300 flex items-center gap-2">
+      <i class="fa-solid fa-sliders"></i>
+      <span>FX Controls</span>
+    </button>
+  </header>
+
+  <!-- Main Content Layout -->
+  <main class="relative z-10 max-w-7xl mx-auto w-full px-4 py-8 flex-1 flex flex-col lg:flex-row items-center justify-center gap-8">
+
+    <!-- Left HUD Column - Agent / Player Quick Card -->
+    <div class="w-full lg:w-1/3 flex flex-col gap-4">
+      <!-- Player Profile Card -->
+      <div class="val-glass val-cut-corner p-6 relative overflow-hidden group border-l-4 border-[var(--primary-color)]">
+        <div class="absolute -right-10 -bottom-10 text-9xl text-white/5 font-valHeader font-bold select-none pointer-events-none">01</div>
+        
+        <div class="flex items-center gap-4 mb-4">
+          <div class="relative w-16 h-16 bg-valNavy border-2 border-valCyan p-1 val-cut-corner flex items-center justify-center overflow-hidden">
+            <i class="fa-solid fa-user-ninja text-3xl text-valCyan"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h2 class="font-valHeader text-3xl tracking-wider text-white">PHANTOM_ACE</h2>
+              <span class="bg-valRed text-black text-[10px] font-bold px-1.5 py-0.5 rounded uppercase">PRO</span>
+            </div>
+            <p class="text-xs font-mono text-gray-400">TAG: #EUW1 • LEVEL 248</p>
+          </div>
+        </div>
+
+        <!-- Rank Stats -->
+        <div class="bg-black/40 p-3 rounded border border-white/5 flex items-center justify-between mb-4">
+          <div class="flex items-center gap-3">
+            <i class="fa-solid fa-gem text-2xl text-valCyan"></i>
+            <div>
+              <div class="text-xs text-gray-400 font-mono">CURRENT RANK</div>
+              <div class="font-valSub font-bold text-lg text-white">RADIANT // 540 RR</div>
+            </div>
+          </div>
+          <span class="text-xs font-mono text-emerald-400">+24 RR</span>
+        </div>
+
+        <!-- Quick Stats Grid -->
+        <div class="grid grid-cols-3 gap-2 text-center font-mono">
+          <div class="bg-white/5 p-2 rounded">
+            <div class="text-[10px] text-gray-400">K/D RATIO</div>
+            <div class="font-bold text-valCyan">1.42</div>
+          </div>
+          <div class="bg-white/5 p-2 rounded">
+            <div class="text-[10px] text-gray-400">WIN RATE</div>
+            <div class="font-bold text-emerald-400">68.4%</div>
+          </div>
+          <div class="bg-white/5 p-2 rounded">
+            <div class="text-[10px] text-gray-400">HS %</div>
+            <div class="font-bold text-valRed">32.1%</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Agent Selection Quick Switcher -->
+      <div class="val-glass val-cut-corner p-4">
+        <h3 class="font-valSub text-sm font-bold tracking-wider text-gray-300 mb-3 uppercase flex items-center gap-2">
+          <i class="fa-solid fa-palette text-valRed"></i> Theme Agent Color Presets
+        </h3>
+        <div class="grid grid-cols-3 gap-2">
+          <button onclick="setTheme('phoenix')" class="val-cut-btn py-2 px-3 bg-valRed/20 hover:bg-valRed text-valRed hover:text-black font-valSub text-xs font-bold tracking-wider transition-all border border-valRed/50 flex flex-col items-center gap-1">
+            <span>PHOENIX</span>
+            <span class="w-2 h-2 rounded-full bg-valRed"></span>
+          </button>
+          <button onclick="setTheme('jett')" class="val-cut-btn py-2 px-3 bg-valCyan/20 hover:bg-valCyan text-valCyan hover:text-black font-valSub text-xs font-bold tracking-wider transition-all border border-valCyan/50 flex flex-col items-center gap-1">
+            <span>JETT</span>
+            <span class="w-2 h-2 rounded-full bg-valCyan"></span>
+          </button>
+          <button onclick="setTheme('reyna')" class="val-cut-btn py-2 px-3 bg-purple-500/20 hover:bg-purple-500 text-purple-400 hover:text-black font-valSub text-xs font-bold tracking-wider transition-all border border-purple-500/50 flex flex-col items-center gap-1">
+            <span>REYNA</span>
+            <span class="w-2 h-2 rounded-full bg-purple-500"></span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Center / Hero Glassmorphism Action Dashboard -->
+    <div class="w-full lg:w-2/3 flex flex-col gap-6">
+      <div class="val-glass val-cut-corner p-8 lg:p-10 relative overflow-hidden border-t-2 border-[var(--primary-color)]">
+        
+        <!-- Decorative Tactical Tag -->
+        <div class="val-tag absolute top-0 left-0 bg-[var(--primary-color)] text-black font-valSub font-bold text-xs px-4 py-1 uppercase tracking-widest">
+          DEFY THE LIMITS
+        </div>
+
+        <div class="mt-4 mb-6">
+          <h1 class="font-valHeader text-6xl md:text-7xl lg:text-8xl tracking-widest text-white leading-none uppercase drop-shadow-lg">
+            TACTICAL <span class="text-transparent bg-clip-text bg-gradient-to-r from-[var(--primary-color)] to-[var(--secondary-color)]">ARENA</span>
+          </h1>
+          <p class="text-gray-300 font-body text-sm md:text-base max-w-xl mt-2 leading-relaxed">
+            High-precision competitive gaming portal with real-time background rendering, custom HUD parameters, and reactive tactical overlays.
+          </p>
+        </div>
+
+        <!-- Action Call To Action Buttons -->
+        <div class="flex flex-wrap gap-4 items-center">
+          <button class="val-cut-btn bg-[var(--primary-color)] hover:bg-white text-black font-valSub font-bold text-lg px-8 py-3 tracking-widest uppercase transition-all duration-300 transform hover:-translate-y-0.5 shadow-lg shadow-[var(--primary-color)]/30 flex items-center gap-3">
+            <i class="fa-solid fa-play"></i>
+            <span>ENTER MATCHMAKING</span>
+          </button>
+          <button class="val-cut-btn bg-black/50 hover:bg-white/10 text-white border border-white/20 font-valSub font-bold text-lg px-6 py-3 tracking-widest uppercase transition-all duration-300 flex items-center gap-2">
+            <i class="fa-solid fa-shield-halved text-[var(--secondary-color)]"></i>
+            <span>AGENT DOSSIER</span>
+          </button>
+        </div>
+
+        <!-- Mini Feature Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8 pt-6 border-t border-white/10">
+          <div class="flex items-start gap-3">
+            <i class="fa-solid fa-crosshair text-xl text-[var(--primary-color)] mt-1"></i>
+            <div>
+              <h4 class="font-valSub text-sm font-bold text-white tracking-wider">AIM LOCK RX</h4>
+              <p class="text-xs text-gray-400 font-mono">Custom reticle preset active</p>
+            </div>
+          </div>
+          <div class="flex items-start gap-3">
+            <i class="fa-solid fa-bolt text-xl text-[var(--secondary-color)] mt-1"></i>
+            <div>
+              <h4 class="font-valSub text-sm font-bold text-white tracking-wider">FPS BOOST</h4>
+              <p class="text-xs text-gray-400 font-mono">GPU Canvas hardware accelerated</p>
+            </div>
+          </div>
+          <div class="flex items-start gap-3">
+            <i class="fa-solid fa-headset text-xl text-emerald-400 mt-1"></i>
+            <div>
+              <h4 class="font-valSub text-sm font-bold text-white tracking-wider">COMM PROTOCOL</h4>
+              <p class="text-xs text-gray-400 font-mono">Voice channel encrypted</p>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </main>
+
+  <!-- FX Controls Side Drawer Modal -->
+  <div id="settingsDrawer" class="fixed top-0 right-0 h-full w-80 bg-valNavy/95 backdrop-blur-xl border-l border-white/10 z-50 transform translate-x-full transition-transform duration-300 p-6 flex flex-col justify-between">
+    <div>
+      <div class="flex items-center justify-between border-b border-white/10 pb-4 mb-6">
+        <h3 class="font-valHeader text-2xl tracking-widest text-white flex items-center gap-2">
+          <i class="fa-solid fa-sliders text-valRed"></i> FX CONTROLS
+        </h3>
+        <button id="closeSettingsBtn" class="text-gray-400 hover:text-white text-xl">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <!-- Controls Form -->
+      <div class="space-y-6 font-mono text-xs">
+        
+        <!-- Neon Glow Intensity Slider -->
+        <div>
+          <div class="flex justify-between text-gray-300 mb-2">
+            <span>NEON GLOW INTENSITY</span>
+            <span id="glowVal" class="text-valCyan">80%</span>
+          </div>
+          <input type="range" id="glowSlider" min="0.1" max="1" step="0.05" value="0.8" class="w-full accent-valCyan cursor-pointer">
+        </div>
+
+        <!-- Particle Speed Slider -->
+        <div>
+          <div class="flex justify-between text-gray-300 mb-2">
+            <span>PARTICLE SPEED</span>
+            <span id="speedVal" class="text-valRed">1.0x</span>
+          </div>
+          <input type="range" id="speedSlider" min="0.2" max="3" step="0.1" value="1" class="w-full accent-valRed cursor-pointer">
+        </div>
+
+        <!-- Particle Density Slider -->
+        <div>
+          <div class="flex justify-between text-gray-300 mb-2">
+            <span>PARTICLE DENSITY</span>
+            <span id="densityVal" class="text-valCyan">70</span>
+          </div>
+          <input type="range" id="densitySlider" min="20" max="150" step="5" value="70" class="w-full accent-valCyan cursor-pointer">
+        </div>
+
+        <!-- Radar Line Toggle -->
+        <div class="flex items-center justify-between pt-2 border-t border-white/10">
+          <span class="text-gray-300">RADAR SWEEP EFFECT</span>
+          <button id="toggleRadarBtn" class="px-3 py-1 bg-valRed text-black font-bold val-cut-btn">ON</button>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Reset Defaults Button -->
+    <button onclick="resetSettings()" class="w-full val-cut-btn py-2 bg-white/10 hover:bg-white/20 text-white font-valSub text-sm tracking-wider uppercase border border-white/20 transition-colors">
+      Reset Background FX
+    </button>
+  </div>
+
+  <!-- Footer -->
+  <footer class="relative z-10 w-full px-6 py-3 border-t border-white/10 bg-valNavy/80 backdrop-blur-md flex flex-col md:flex-row items-center justify-between text-[11px] font-mono text-gray-400 gap-2">
+    <div>
+      VALORANT IS A REGISTERED TRADEMARK OF RIOT GAMES INC. FAN MADE HUD ENGINE.
+    </div>
+    <div class="flex items-center gap-4 text-gray-300">
+      <span>SYSTEM STATUS: <span class="text-emerald-400">OPTIMAL</span></span>
+      <span>•</span>
+      <span>SECURITY: <span class="text-valCyan">VANGUARD ACTIVE</span></span>
+    </div>
+  </footer>
+
+  <script>
+    /* Global Background State Variables */
+    let glowOpacity = 0.8;
+    let particleSpeed = 1.0;
+    let particleCount = 70;
+    let radarActive = true;
+
+    // Theme definitions
+    const themes = {
+      phoenix: { primary: '#ff4655', secondary: '#00f0ff' },
+      jett: { primary: '#00f0ff', secondary: '#38bdf8' },
+      reyna: { primary: '#a855f7', secondary: '#ff4655' }
+    };
+
+    /* Initialize Particle Canvas Engine */
+    const canvas = document.getElementById('particleCanvas');
+    const ctx = canvas.getContext('2d');
+    let particles = [];
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    class Particle {
+      constructor() {
+        this.reset();
+      }
+
+      reset() {
+        this.x = Math.random() * canvas.width;
+        this.y = Math.random() * canvas.height;
+        this.size = Math.random() * 2.5 + 0.5;
+        this.speedX = (Math.random() - 0.5) * 0.8 * particleSpeed;
+        this.speedY = (Math.random() - 0.5) * 0.8 * particleSpeed;
+        this.color = Math.random() > 0.5 ? getComputedStyle(document.documentElement).getPropertyValue('--primary-color').trim() : getComputedStyle(document.documentElement).getPropertyValue('--secondary-color').trim();
+        this.alpha = Math.random() * 0.6 + 0.2;
+      }
+
+      update() {
+        this.x += this.speedX * particleSpeed;
+        this.y += this.speedY * particleSpeed;
+
+        if (this.x < 0 || this.x > canvas.width || this.y < 0 || this.y > canvas.height) {
+          this.reset();
+        }
+      }
+
+      draw() {
+        ctx.save();
+        ctx.globalAlpha = this.alpha * glowOpacity;
+        ctx.fillStyle = this.color;
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = this.color;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+
+    function initParticles() {
+      particles = [];
+      for (let i = 0; i < particleCount; i++) {
+        particles.push(new Particle());
+      }
+    }
+
+    function animateParticles() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      particles.forEach(p => {
+        p.update();
+        p.draw();
+      });
+      requestAnimationFrame(animateParticles);
+    }
+
+    /* Controls Drawer Handler */
+    const settingsDrawer = document.getElementById('settingsDrawer');
+    const toggleSettingsBtn = document.getElementById('toggleSettingsBtn');
+    const closeSettingsBtn = document.getElementById('closeSettingsBtn');
+
+    toggleSettingsBtn.addEventListener('click', () => {
+      settingsDrawer.classList.toggle('translate-x-full');
+    });
+
+    closeSettingsBtn.addEventListener('click', () => {
+      settingsDrawer.classList.add('translate-x-full');
+    });
+
+    /* Range Sliders Input Event Listeners */
+    document.getElementById('glowSlider').addEventListener('input', (e) => {
+      glowOpacity = parseFloat(e.target.value);
+      document.documentElement.style.setProperty('--glow-opacity', glowOpacity);
+      document.getElementById('glowVal').innerText = Math.round(glowOpacity * 100) + '%';
+    });
+
+    document.getElementById('speedSlider').addEventListener('input', (e) => {
+      particleSpeed = parseFloat(e.target.value);
+      document.getElementById('speedVal').innerText = particleSpeed.toFixed(1) + 'x';
+    });
+
+    document.getElementById('densitySlider').addEventListener('input', (e) => {
+      particleCount = parseInt(e.target.value);
+      document.getElementById('densityVal').innerText = particleCount;
+      initParticles();
+    });
+
+    document.getElementById('toggleRadarBtn').addEventListener('click', (e) => {
+      radarActive = !radarActive;
+      const radarLine = document.querySelector('.radar-line');
+      if (radarActive) {
+        radarLine.style.display = 'block';
+        e.target.innerText = 'ON';
+        e.target.className = 'px-3 py-1 bg-valRed text-black font-bold val-cut-btn';
+      } else {
+        radarLine.style.display = 'none';
+        e.target.innerText = 'OFF';
+        e.target.className = 'px-3 py-1 bg-white/20 text-white font-bold val-cut-btn';
+      }
+    });
+
+    /* Theme Switcher Function */
+    function setTheme(agentKey) {
+      const theme = themes[agentKey];
+      if (!theme) return;
+
+      document.documentElement.style.setProperty('--primary-color', theme.primary);
+      document.documentElement.style.setProperty('--secondary-color', theme.secondary);
+
+      document.getElementById('glowRed').style.background = theme.primary;
+      document.getElementById('glowCyan').style.background = theme.secondary;
+
+      // Update active particles colors
+      initParticles();
+    }
+
+    function resetSettings() {
+      glowOpacity = 0.8;
+      particleSpeed = 1.0;
+      particleCount = 70;
+      setTheme('phoenix');
+
+      document.getElementById('glowSlider').value = 0.8;
+      document.getElementById('speedSlider').value = 1;
+      document.getElementById('densitySlider').value = 70;
+
+      document.getElementById('glowVal').innerText = '80%';
+      document.getElementById('speedVal').innerText = '1.0x';
+      document.getElementById('densityVal').innerText = '70';
+
+      document.documentElement.style.setProperty('--glow-opacity', 0.8);
+      initParticles();
+    }
+
+    /* Start App Engine On Load */
+    window.onload = function () {
+      initParticles();
+      animateParticles();
+    };
+  </script>
+</body>
+</html>
